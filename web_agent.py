@@ -2,8 +2,8 @@ import pyautogui
 import random
 import time
 import requests
-import websocket
-import json
+import playwright
+from playwright.sync_api import sync_playwright
 
 pyautogui.FAILSAFE = True
 
@@ -30,86 +30,62 @@ def press_key():
     time.sleep(random.uniform(0.08, 0.8))
     pyautogui.press("enter")
 
-def move_and_click(x, y):
-    pyautogui.moveTo(
-        x,
-        y,
-        duration=random.uniform(0.4, 1.5)
-    )
+def move_and_click(page, link):
+    x = link["x"]
+    y = link["y"]
 
-    time.sleep(random.uniform(1, 3))
+    print(f"Selected link: {link['text']}")
 
-    pyautogui.click()
+    # Move cursor to the hyperlink
+    page.mouse.move(x, y, steps=random.randint(15, 30))
 
-def get_tabs():
-    response = requests.get("http://localhost:9222/json")
-    return response.json()
+    short_pause()
 
-def get_current_page():
-    tabs = get_tabs()
+    # Click the hyperlink
+    page.mouse.click(x, y)
 
-    for tab in tabs:
-        if tab.get("type") == "page":
-            url = tab.get("url", "")
+    reading_pause()
 
-            if url.startswith("http"):
-                return tab
+    print(f"Current URL: {page.url}")
 
-    return None
+def find_links(page):
+    elements = page.locator("a[href]")
+    links = []
 
-def find_links():
-    page = get_current_page()
+    viewport = page.viewport_size
 
-    if page is None:
-        return []
+    for i in range(elements.count()):
+        element = elements.nth(i)
 
-    ws_url = page["webSocketDebuggerUrl"]
-    ws = websocket.create_connection(ws_url)
+        if not element.is_visible():
+            continue
 
-    command = {
-        "id": 1,
-        "method": "Runtime.evaluate",
-        "params": {
-            "expression": """
-                Array.from(document.querySelectorAll('a'))
-                    .map(link => {
-                        const rect = link.getBoundingClientRect();
+        text = element.inner_text().strip()
 
-                        return {
-                            text: link.innerText.trim(),
-                            url: link.href,
+        if not text:
+            continue
 
-                            x: window.screenX +
-                            (window.outerWidth - window.innerWidth) / 2 +
-                            rect.left +
-                            rect.width / 2,
+        box = element.bounding_box()
 
-                            y: window.screenY +
-                            (window.outerHeight - window.innerHeight) +
-                            rect.top +
-                            rect.height / 2,
+        if box is None:
+            continue
 
-                            width: rect.width,
-                            height: rect.height
-                        };
-                    })
-                    .filter(link =>
-                        link.text.length > 0 &&
-                        link.width > 0 &&
-                        link.height > 0
-                    )
-            """,
-            "returnByValue": True
-        }
-    }
+        x = box["x"] + box["width"] / 2
+        y = box["y"] + box["height"] / 2
 
-    ws.send(json.dumps(command))
+        # Exclude links outside the current viewport
+        if viewport:
+            if not (0 <= x < viewport["width"]):
+                continue
+            if not (0 <= y < viewport["height"]):
+                continue
 
-    response = json.loads(ws.recv())
-
-    ws.close()
-
-    links = response["result"]["result"]["value"]
+        links.append({
+            "text": text,
+            "url": element.get_attribute("href"),
+            "x": x,
+            "y": y
+        })
 
     return links
 
@@ -158,37 +134,47 @@ def browse_page():
             time.sleep(random.uniform(1.5, 4))
             
 def main():
-    print("Agent starts in 5 seconds...")
-    print("Switch to your browser now!")
-    time.sleep(5)
+    with sync_playwright() as p:
 
-    navigate(random.choice(url_list))
-    browse_page()
-    print(pyautogui.position())
-
-    links = find_links()
-
-    for link in links:
-        print(
-            link["text"],
-            link["x"],
-            link["y"]
+        browser = p.chromium.launch(
+            headless=False,
+            channel="chrome"
         )
+
+        page = browser.new_page(
+            viewport={"width": 1280, "height": 800}
+        )
+
+        page.goto(random.choice(url_list))
+
+        print("Browser opened successfully")
+        print(page.title())
+
+        print("Scrolling webpage...")
+        browse_page()
+
+        print("Finding links after scrolling...")
+        links = find_links(page)
+
+        if links:
+            selected_link = random.choice(links)
+
+            move_and_click(page, selected_link)
+
+            print("Page after clicking:", page.title())
+            print(f"Found {len(links)} visible links")
+
+        for link in links[:10]:
+            print(
+                link["text"],
+                link["x"],
+                link["y"]
+            )
+
+        input("Press Enter to close the browser...")
+
+        browser.close()
 
 if __name__ == "__main__":
     main()
 
-#Next Step
-#Research the human behaviour vs agent behaviour
-#implementing states to consider whether what action the agent will conduct according to the situation
-#generate the agent's personality
-# Reading speed      224 WPM
-# Patience           medium
-# Scrolling          moderately fast
-# Backtracking       occasional
-# Typing             medium
-# Curiosity          high
-
-#browser
-#typing url
-#browsing
