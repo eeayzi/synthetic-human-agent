@@ -36,17 +36,49 @@ def move_and_click(page, link):
 
     print(f"Selected link: {link['text']}")
 
-    # Move cursor to the hyperlink
+    # Record tabs before clicking
+    context = page.context
+    previous_pages = set(context.pages)
+
+    # Move and click
     page.mouse.move(x, y, steps=random.randint(15, 30))
-
     short_pause()
-
-    # Click the hyperlink
+    original_url = page.url
     page.mouse.click(x, y)
 
-    reading_pause()
+    # Allow navigation or a new tab to begin
+    try:
+        page.wait_for_url(
+            lambda url: str(url) != original_url,
+            timeout=5000
+        )
+    except Exception:
+        pass
 
-    print(f"Current URL: {page.url}")
+    # Detect newly opened tabs
+    new_pages = [
+        p for p in context.pages
+        if p not in previous_pages
+    ]
+
+    if new_pages:
+        page = new_pages[-1]
+        print("New tab detected. Switching to it.")
+    else:
+        print("No new tab. Continuing with original tab.")
+
+    # Wait for the destination page
+    try:
+        page.wait_for_load_state(
+            "domcontentloaded",
+            timeout=10000
+        )
+    except Exception as e:
+        print(f"Page loading warning: {e}")
+
+    print("Current URL:", page.url)
+
+    return page
 
 def find_links(page):
     elements = page.locator("a[href]")
@@ -159,7 +191,7 @@ def main():
         if links:
             selected_link = random.choice(links)
 
-            move_and_click(page, selected_link)
+            page = move_and_click(page, selected_link)
 
             print("Page after clicking:", page.title())
             print(f"Found {len(links)} visible links")
