@@ -4,218 +4,37 @@ import time
 import re
 from playwright.sync_api import sync_playwright
 
-pyautogui.FAILSAFE = True
-
 url_list = [
     "https://www.coinmarketcap.com",
-    "https://www.coursera.org",
     "https://www.coinbase.com",
     "https://coingecko.com",
-    "https://www.samsung.com",
-    "https://aws.amazon.com",
-    "https://www.amazon.com",
-    "https://www.apple.com",
-    "https://apnews.com",
-    "https://www.dell.com"
 ]
 
-persona = {
-    "name": "Finance Explorer",
-    "interests": {
-        "finance": 5,
-        "investment": 5,
-        "stock": 5,
-        "market": 4,
-        "crypto": 5,
-        "bitcoin": 5,
-        "economy": 4,
-        "business": 3,
-        "technology": 3,
-        "AI": 3
-    },
-    "avoid": [
-        "sign in",
-        "sign up",
-        "log in",
-        "register",
-        "contact us",
-        "privacy policy",
-        "create account",
-        "accept cookies"
-    ]
+# Direct Bitcoin pages, used only if the Bitcoin link can't be found by clicking
+BITCOIN_URLS = {
+    "coinmarketcap": "https://coinmarketcap.com/currencies/bitcoin/",
+    "coinbase": "https://www.coinbase.com/price/bitcoin",
+    "coingecko": "https://www.coingecko.com/en/coins/bitcoin",
 }
+
+# Matches hrefs that end with /bitcoin (and not /bitcoin-cash, etc.)
+BITCOIN_HREF = re.compile(r"/bitcoin/?(?:[?#].*)?$", re.I)
+
+SCROLL_DOWN_SECONDS = 30
+SCROLL_UP_SECONDS = 5
+
 
 def short_pause():
     time.sleep(random.uniform(0.3, 0.6))
 
+
 def reading_pause():
     time.sleep(random.uniform(2, 7))
+
 
 def press_key():
     time.sleep(random.uniform(0.08, 0.8))
     pyautogui.press("enter")
-
-def move_and_click(page, link):
-    x = link["x"]
-    y = link["y"]
-
-    print(f"Selected link: {link['text']}")
-
-    # Record tabs before clicking
-    context = page.context
-    previous_pages = set(context.pages)
-
-    # Move and click
-    page.mouse.move(x, y, steps=random.randint(15, 30))
-    short_pause()
-    original_url = page.url
-    page.mouse.click(x, y)
-
-    # Allow navigation or a new tab to begin
-    try:
-        page.wait_for_url(
-            lambda url: str(url) != original_url,
-            timeout=5000
-        )
-    except Exception:
-        pass
-
-    # Detect newly opened tabs
-    new_pages = [
-        p for p in context.pages
-        if p not in previous_pages
-    ]
-
-    if new_pages:
-        page = new_pages[-1]
-        print("New tab detected. Switching to it.")
-    else:
-        print("No new tab. Continuing with original tab.")
-
-    # Wait for the destination page
-    try:
-        page.wait_for_load_state(
-            "domcontentloaded",
-            timeout=10000
-        )
-    except Exception as e:
-        print(f"Page loading warning: {e}")
-
-    print("Current URL:", page.url)
-
-    return page
-
-def find_links(page):
-    elements = page.locator("a[href]")
-    links = []
-
-    viewport = page.viewport_size
-
-    for i in range(elements.count()):
-        element = elements.nth(i)
-
-        if not element.is_visible():
-            continue
-
-        text = " ".join(element.inner_text().split())
-
-        if not text:
-            continue
-
-        # Keep the full text for future persona analysis
-        full_text = text
-
-        # Shorten the display text
-        display_text = text[:100]
-
-        if len(text) > 100:
-            display_text += "..."
-
-        box = element.bounding_box()
-
-        if box is None:
-            continue
-
-        x = box["x"] + box["width"] / 2
-        y = box["y"] + box["height"] / 2
-
-        # Exclude links outside the current viewport
-        if viewport:
-            if not (0 <= x < viewport["width"]):
-                continue
-            if not (0 <= y < viewport["height"]):
-                continue
-
-        links.append({
-            "text": display_text,
-            "full_text": full_text,
-            "url": element.get_attribute("href"),
-            "x": x,
-            "y": y
-        })
-
-    return links
-
-def choose_link(links, persona):
-    candidates = []
-    weights = []
-
-    for link in links:
-        text = link["full_text"].lower()
-        url = (link["url"] or "").lower()
-
-        # STEP 1: Filter unwanted links
-        if any(
-            phrase in text
-            for phrase in persona["avoid"]
-        ):
-            continue
-
-        # STEP 2: Calculate persona relevance
-        score = 0
-
-        for keyword, weight in persona["interests"].items():
-            keyword = keyword.lower()
-
-            # Match whole words or phrases
-            pattern = rf"\b{re.escape(keyword)}\b"
-
-            if re.search(pattern, text):
-                score += weight
-
-            elif re.search(pattern, url):
-                score += weight * 0.5
-
-        # STEP 3: Exclude unrelated links
-        if score <= 0:
-            continue
-
-        candidates.append(link)
-        weights.append(score)
-
-    # STEP 4: Handle no relevant links
-    if not candidates:
-        print("No persona-relevant links found.")
-        return None
-
-    # STEP 5: Weighted random selection
-    selected_link = random.choices(
-        candidates,
-        weights=weights,
-        k=1
-    )[0]
-
-    print(f"Relevant candidates: {len(candidates)}")
-    print(f"Selected relevance score: {weights[candidates.index(selected_link)]}")
-
-    return selected_link
-
-
-def go_back():
-    time.sleep(random.uniform(0.5, 3.1))
-    
-    pyautogui.hotkey("alt", "left")
-    reading_pause()
 
 def navigate(url):
     print(f"Navigating to {url}")
@@ -229,230 +48,213 @@ def navigate(url):
     )
 
     short_pause()
-
     press_key()
 
     reading_pause()
 
     print("Navigation completed")
 
-def browse_page(page):
-    scroll_count = random.randint(3, 7)
+def browse_page():
+    scroll_count = random.randint(1,3)
     print(f"Scroll count: {scroll_count}")
 
     for i in range(scroll_count):
-        scroll_amount = random.randint(50, 500)
+        scroll_amount = random.randint(100, 500)
         print(f"Scroll amount: {scroll_amount}")
-        page.mouse.wheel(0, scroll_amount)
 
+        # Scroll down
+        pyautogui.scroll(-scroll_amount)
         reading_pause()
 
+        # 15% chance of scrolling upward
         if random.random() < 0.15:
-            upward_amount = random.randint(50, 300)
-            page.mouse.wheel(0, -upward_amount)
+            upward_amount = random.randint(50, 100)
+            pyautogui.scroll(upward_amount)
+
             short_pause()
+            time.sleep(random.uniform(0.5, 1.2))
 
-            time.sleep(random.uniform(1.5, 4))
 
-def close_popups(page):
-    print("Checking for popups...")
+def close_popups_news(page, timeout=10000):
+    dialog = page.locator('[role="dialog"], [aria-modal="true"]').first
+    try:
+        dialog.wait_for(state="visible", timeout=timeout)   # wait for the banner
+    except Exception:
+        print("No popup appeared.")
+        return
 
-    handled = False
+    # Click inside the banner (on its container, not a button) to give the page focus
+    box = dialog.bounding_box()
+    page.mouse.move(box["x"] + 5, box["y"] + 5, steps=random.randint(10, 20))
+    page.mouse.click(box["x"] + 5, box["y"] + 5)
+    short_pause()
 
-    for frame in page.frames:
+    page.keyboard.press("Escape")
+    print("Pressed Escape")
 
-        # STEP 1: Find cookie-consent containers
-        cookie_containers = frame.locator(
-            '[id*="cookie" i], '
-            '[class*="cookie" i], '
-            '[id*="consent" i], '
-            '[class*="consent" i]'
-        )
 
-        for i in range(min(cookie_containers.count(), 15)):
-            container = cookie_containers.nth(i)
+# ---------------------------------------------------------------------------
+# Scrolling
+# ---------------------------------------------------------------------------
 
-            try:
-                if not container.is_visible():
-                    continue
+def move_cursor_to_page():
+    """pyautogui's wheel acts on the window under the OS cursor, so park the
+    cursor in the middle of the (maximized) browser window first."""
+    width, height = pyautogui.size()
+    pyautogui.moveTo(width / 2, height / 2, duration=random.uniform(0.3, 0.8))
 
-                # Prefer rejecting optional cookies
-                reject = container.get_by_role(
-                    "button",
-                    name=re.compile(
-                        r"reject|decline|necessary only|essential only",
-                        re.I
-                    )
-                )
 
-                if reject.count() > 0 and reject.first.is_visible():
-                    reject.first.click(timeout=2000)
-                    print("Cookie preferences handled.")
-                    handled = True
-                    break
+def scroll_down_for(seconds):
+    """Keep scrolling down in random steps for the given number of seconds."""
+    print(f"Scrolling down for {seconds} seconds...")
+    end_time = time.monotonic() + seconds
 
-            except Exception:
+    while time.monotonic() < end_time:
+        pyautogui.scroll(-random.randint(100, 400))
+        time.sleep(random.uniform(0.5, 2.0))
+
+
+def scroll_to_top(page, seconds):
+    """Scroll back to the top within the given number of seconds."""
+    print(f"Scrolling back to the top within {seconds} seconds...")
+    end_time = time.monotonic() + seconds
+
+    while time.monotonic() < end_time:
+        if page.evaluate("window.scrollY") <= 0:
+            break
+        pyautogui.scroll(random.randint(500, 900))
+        time.sleep(random.uniform(0.2, 0.5))
+
+    # Safety net in case time ran out before reaching the top
+    page.evaluate("window.scrollTo(0, 0)")
+    short_pause()
+
+
+# ---------------------------------------------------------------------------
+# Clicking
+# ---------------------------------------------------------------------------
+
+def move_and_click(page, x, y):
+    """Move the mouse to (x, y) in small steps, pause, then click."""
+    page.mouse.move(x, y, steps=random.randint(15, 30))
+    short_pause()
+    page.mouse.click(x, y)
+
+
+def wait_for_navigation(page, original_url, timeout=10000):
+    """Return True once the URL changes and the new page has loaded."""
+    try:
+        page.wait_for_url(lambda url: str(url) != original_url, timeout=timeout)
+        page.wait_for_load_state("domcontentloaded", timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+def click_bitcoin(page):
+    """Click the Bitcoin link on a coin market page. Returns True on success."""
+    anchors = page.locator('a[href*="bitcoin" i]')
+
+    for i in range(min(anchors.count(), 50)):
+        anchor = anchors.nth(i)
+
+        try:
+            href = anchor.get_attribute("href") or ""
+            if not BITCOIN_HREF.search(href):
+                continue
+            if not anchor.is_visible():
                 continue
 
-        if handled:
+            anchor.scroll_into_view_if_needed(timeout=2000)
+            box = anchor.bounding_box()
+            if box is None:
+                continue
+        except Exception:
             continue
 
-        # STEP 2: Find visible dialogs
-        dialogs = frame.locator(
-            '[role="dialog"], [aria-modal="true"]'
+        print(f"Clicking Bitcoin link: {href}")
+        original_url = page.url
+        move_and_click(
+            page,
+            box["x"] + box["width"] / 2,
+            box["y"] + box["height"] / 2,
         )
 
-        for i in range(min(dialogs.count(), 10)):
-            dialog = dialogs.nth(i)
+        if not wait_for_navigation(page, original_url):
+            print("Click did not navigate to a new page.")
+            return False
 
-            try:
-                if not dialog.is_visible():
-                    continue
+        print("Bitcoin page URL:", page.url)
+        return True
 
-                # First attempt: named close button
-                close_button = dialog.get_by_role(
-                    "button",
-                    name=re.compile(
-                        r"^(close|dismiss|no thanks|not now)$",
-                        re.I
-                    )
-                )
+    print("No Bitcoin link found.")
+    return False
 
-                if close_button.count() > 0 and close_button.first.is_visible():
-                    close_button.first.click(timeout=2000)
-                    print("Dialog closed using button.")
-                    handled = True
-                    break
 
-                # Second attempt: Escape key
-                page.keyboard.press("Escape")
-                page.wait_for_timeout(300)
+# ---------------------------------------------------------------------------
+# Visiting the coin market websites
+# ---------------------------------------------------------------------------
 
-                if not dialog.is_visible():
-                    print("Dialog closed using Escape.")
-                    handled = True
-                    break
+def open_new_tab(page):
+    """Open a new tab and bring it to the front (pyautogui types into it)."""
+    short_pause()
+    new_page = page.context.new_page()
+    new_page.bring_to_front()
+    short_pause()
+    return new_page
 
-            except Exception:
-                continue
 
-    if not handled:
-        print("No dismissible popup recognized.")
+def visit_coin_site(page, url):
+    """Open the site, scroll down and back up, open Bitcoin and browse it."""
+    # Enter the website
+    navigate(url)
+    close_popups_news(page, timeout=5000)
 
-    return handled
+    # Scroll down for 30 s, then back to the top within 5 s
+    move_cursor_to_page()
+    scroll_down_for(SCROLL_DOWN_SECONDS)
+    scroll_to_top(page, SCROLL_UP_SECONDS)
 
-def inspect_popups(page):
-    print("\n--- Popup inspection ---")
+    # Select Bitcoin (fall back to its direct URL if the link isn't found)
+    if not click_bitcoin(page):
+        for site, bitcoin_url in BITCOIN_URLS.items():
+            if site in url:
+                print("Falling back to the direct Bitcoin URL.")
+                navigate(bitcoin_url)
+                break
 
-    for frame in page.frames:
-        dialogs = frame.locator(
-            '[role="dialog"], '
-            '[aria-modal="true"], '
-            '[class*="cookie" i], '
-            '[id*="cookie" i], '
-            '[class*="consent" i], '
-            '[id*="consent" i]'
-        )
+    # Browse the Bitcoin page
+    close_popups_news(page, timeout=3000)
+    move_cursor_to_page()
+    browse_page()
 
-        try:
-            count = min(dialogs.count(), 20)
 
-            for i in range(count):
-                dialog = dialogs.nth(i)
-
-                if dialog.is_visible():
-                    text = " ".join(dialog.inner_text().split())
-
-                    print("Visible popup candidate:")
-                    print(text[:300])
-
-        except Exception as e:
-            print("Inspection warning:", e)
-
-    print("--- Inspection complete ---\n")
-            
 def main():
-    SESSION_DURATION = 60
-
     with sync_playwright() as p:
-        browser = p.chromium.launch(
+            browser = p.chromium.launch(
             headless=False,
-            channel="chrome"
+            channel="chrome",
+            args=["--start-maximized"],
         )
 
-        try:
-            page = browser.new_page(
-                viewport={"width": 1280, "height": 800}
-            )
+            context = browser.new_context(no_viewport=True)
+            page = context.new_page()
+            short_pause()
 
-            start_time = time.monotonic()
-            end_time = start_time + SESSION_DURATION
+            # Visit all three coin market websites in a random order
+            sites = random.sample(url_list, len(url_list))
+            print("Visiting order:", sites)
 
-            start_url = "https://www.amazon.com"
-            print(f"Starting website: {start_url}")
+            current_page = page
+            for i, url in enumerate(sites):
+                if i > 0:
+                    current_page = open_new_tab(current_page)
 
-            page.goto(start_url, wait_until="domcontentloaded")
+                visit_coin_site(current_page, url)
+                print(f"Completed {i + 1}/{len(sites)}: {url}")
 
-            inspect_popups(page)
-            close_popups(page)
-
-            visit_count = 0
-
-            while time.monotonic() < end_time:
-                visit_count += 1
-
-                print(f"\n--- Browsing cycle {visit_count} ---")
-                print("Current URL:", page.url)
-
-                # Handle any new cookie banners
-                close_popups(page)
-
-                # Browse the current page
-                print("Scrolling webpage...")
-                browse_page(page)
-
-                # Soft deadline: finish the current action
-                if time.monotonic() >= end_time:
-                    print("Session time reached. Stopping.")
-                    break
-
-                print("Finding links...")
-                links = find_links(page)
-
-                print(f"Found {len(links)} visible links")
-
-                if not links:
-                    page.goto(
-                        random.choice(url_list),
-                        wait_until="domcontentloaded"
-                    )
-                    continue
-
-                selected_link = choose_link(links, persona)
-
-                if selected_link is None:
-                    print("No suitable links found.")
-                    page.goto(
-                        random.choice(url_list),
-                        wait_until="domcontentloaded"
-                    )
-                    continue
-
-                print("Persona selected:", selected_link["text"])
-
-                page = move_and_click(page, selected_link)
-
-                print("Now browsing:", page.url)
-
-            elapsed = time.monotonic() - start_time
-
-            print("\n--- Session finished ---")
-            print(f"Elapsed time: {elapsed:.1f} seconds")
-            print(f"Browsing cycles: {visit_count}")
-
-        finally:
+            reading_pause()
             browser.close()
-
 
 if __name__ == "__main__":
     main()
