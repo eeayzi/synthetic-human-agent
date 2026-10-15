@@ -3,7 +3,7 @@ import random
 import time
 import re
 import math
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 # Teammate's helper (keep stealth_mouse.py in the same folder as this script)
 from stealth_mouse import (
@@ -42,12 +42,68 @@ SCROLL_DOWN_SECONDS = 30
 SCROLL_UP_SECONDS = 5
 
 
+# ---------------------------------------------------------------------------
+# Cancellation / deadline control
+#
+# main.py calls set_run_control(stop_event, deadline) (or passes them to
+# run_web_phase / visit_coin_site). Every wait and every loop below calls
+# check_stop(), so the phase ends promptly when:
+#   - stop_event is set (threading.Event), or
+#   - the deadline passes (a time.monotonic() timestamp).
+# Both are optional; with neither set the code behaves as before.
+# ---------------------------------------------------------------------------
+
+class StopRequested(Exception):
+    """Raised when the phase must end (stop_event set or deadline reached)."""
+
+
+_stop_event = None
+_deadline = None
+
+
+def set_run_control(stop_event=None, deadline=None):
+    """stop_event: threading.Event or None.
+    deadline: absolute time.monotonic() timestamp or None."""
+    global _stop_event, _deadline
+    _stop_event = stop_event
+    _deadline = deadline
+
+
+def should_stop():
+    if _stop_event is not None and _stop_event.is_set():
+        return True
+    if _deadline is not None and time.monotonic() >= _deadline:
+        return True
+    return False
+
+
+def check_stop():
+    if should_stop():
+        raise StopRequested()
+
+
+def sleep(seconds):
+    """Interruptible replacement for time.sleep(): sleeps in short slices and
+    raises StopRequested as soon as a stop/deadline is reached."""
+    end = time.monotonic() + max(0.0, seconds)
+    while True:
+        check_stop()
+        remaining = end - time.monotonic()
+        if remaining <= 0:
+            return
+        time.sleep(min(remaining, 0.1))
+
+
+# ---------------------------------------------------------------------------
+# Basic helpers
+# ---------------------------------------------------------------------------
+
 def short_pause():
-    time.sleep(random.uniform(0.3, 0.6))
+    sleep(random.uniform(0.3, 0.6))
 
 
 def reading_pause(scale=1.0):
-    time.sleep(random.uniform(2, 7) * scale)
+    sleep(random.uniform(2, 7) * scale)
 
 
 def human_scroll(amount):
@@ -56,14 +112,16 @@ def human_scroll(amount):
     direction = -1 if amount < 0 else 1
     remaining = abs(amount)
     while remaining > 0:
+        check_stop()
         notch = min(remaining, random.randint(60, 140))
         pyautogui.scroll(direction * notch, _pause=False)
         remaining -= notch
-        time.sleep(random.uniform(0.02, 0.09))
+        sleep(random.uniform(0.02, 0.09))
 
 
 def press_key():
-    time.sleep(random.uniform(0.08, 0.8))
+    sleep(random.uniform(0.08, 0.8))
+    check_stop()
     pyautogui.press("enter")
 
 
@@ -76,14 +134,15 @@ def site_name(url):
 
 
 def navigate(url, pause_scale=1.0):
-
+    check_stop()
     pyautogui.hotkey("ctrl", "l")
     short_pause()
 
-    pyautogui.write(
-        url,
-        interval=random.uniform(0.03, 0.10)
-    )
+    # Type one character at a time so a stop request can interrupt typing
+    for ch in url:
+        check_stop()
+        pyautogui.write(ch, _pause=False)
+        sleep(random.uniform(0.03, 0.10))
 
     short_pause()
     press_key()
@@ -91,11 +150,12 @@ def navigate(url, pause_scale=1.0):
     reading_pause(pause_scale)
 
 
-
 def browse_page(page):
     scroll_count = random.randint(1, 3)
 
     for i in range(scroll_count):
+        check_stop()
+
         # A popup may have jumped out while reading: close it first
         close_popups(page, timeout=0)
 
@@ -112,7 +172,7 @@ def browse_page(page):
             human_scroll(upward_amount)
 
             short_pause()
-            time.sleep(random.uniform(0.5, 1.2))
+            sleep(random.uniform(0.5, 1.2))
 
     # A popup may have appeared during the last reading pause
     close_popups(page, timeout=0)
@@ -312,6 +372,8 @@ def close_popups(page, timeout=6):
     seen = {}
 
     while clicks < 6 and attempts < 12:
+        check_stop()
+
         # Where to look: the page itself, plus fixed-position iframes
         frames = [(page.main_frame, False, None)]
         try:
@@ -348,7 +410,7 @@ def close_popups(page, timeout=6):
             # Nothing (more) to close; keep waiting only if nothing was closed yet
             if clicks or time.monotonic() >= deadline:
                 break
-            time.sleep(0.5)
+            sleep(0.5)
             continue
 
         attempts += 1
@@ -379,7 +441,7 @@ def close_popups(page, timeout=6):
                 page.mouse.click(click_x, click_y)       # the real click missed
 
         clicks += 1
-        time.sleep(random.uniform(0.6, 1.0))
+        sleep(random.uniform(0.6, 1.0))
 
     # Closed something: make sure the page can scroll again
     if clicks:
@@ -403,7 +465,9 @@ def close_popups(page, timeout=6):
 # ---------------------------------------------------------------------------
 
 def move_mouse_human(x, y):
-    """Move the real cursor to screen position (x, y) along a curved path."""
+    """Move the real cursor to screen position (x, y) along a curved path.
+    Checks for a stop request on every step of the movement."""
+    check_stop()
     screen_width, screen_height = pyautogui.size()
 
     # Stay away from the screen corners (pyautogui's fail-safe triggers there)
@@ -414,9 +478,12 @@ def move_mouse_human(x, y):
     start, end = (current.x, current.y), (x, y)
     distance = distance_between(start, end)
 
-    # Too short for a curve: use the plain eased move from the helper
+    # Too short for a curve: use the plain eased move from the helper.
+    # (The helper has no cancellation yet - see checklist item 4 - so the
+    # duration is kept short, at most 0.3 s.)
     if distance < 30:
         move_cursor_to(x, y, duration=random.uniform(0.1, 0.3))
+        check_stop()
         return
 
     # Two control points, pushed sideways off the straight line
@@ -442,6 +509,7 @@ def move_mouse_human(x, y):
     per_step = duration / steps
 
     for i, (px, py) in enumerate(path):
+        check_stop()
         px = min(max(px, 2), screen_width - 3)
         py = min(max(py, 2), screen_height - 3)
 
@@ -449,7 +517,7 @@ def move_mouse_human(x, y):
         pyautogui.moveTo(px, py, _pause=False)
 
         # Slower at both ends of the movement, faster in the middle
-        time.sleep(per_step * (1.6 - math.sin(math.pi * i / steps)))
+        sleep(per_step * (1.6 - math.sin(math.pi * i / steps)))
 
 
 def wander_mouse():
@@ -512,13 +580,17 @@ def scroll_down_for(page, seconds, mid_event=None):
         event_at = time.monotonic() + seconds * random.uniform(0.25, 0.7)
 
     while time.monotonic() < end_time:
+        check_stop()
+
         # Time for the special event of this website
         if event_at is not None and time.monotonic() >= event_at:
             paused_at = time.monotonic()
             event_at = None
             try:
                 mid_event(page)
-            except Exception as error:
+            except StopRequested:
+                raise                      # never swallow a stop request
+            except Exception:
                 pass
             end_time += time.monotonic() - paused_at
             continue
@@ -545,24 +617,25 @@ def scroll_down_for(page, seconds, mid_event=None):
 
         # Now and then scroll back up a little, as if re-reading something
         if random.random() < 0.08:
-            time.sleep(random.uniform(0.4, 1.0))
+            sleep(random.uniform(0.4, 1.0))
             human_scroll(random.randint(60, 150))
 
         # Mostly short pauses, sometimes stop for a moment to read
         if random.random() < 0.12:
-            time.sleep(random.uniform(2.5, 4.5))
+            sleep(random.uniform(2.5, 4.5))
         else:
-            time.sleep(random.uniform(0.6, 2.2))
+            sleep(random.uniform(0.6, 2.2))
 
 
 def scroll_to_top(page, max_seconds=8):
     """Scroll back up to the top of the page with the mouse wheel."""
     end_time = time.monotonic() + max_seconds
     while time.monotonic() < end_time:
+        check_stop()
         if page.evaluate("window.scrollY") <= 0:
             break
         pyautogui.scroll(random.randint(500, 900))
-        time.sleep(random.uniform(0.3, 0.5))
+        sleep(random.uniform(0.3, 0.5))
     short_pause()
 
 
@@ -588,6 +661,8 @@ def scroll_to_bitcoin(page, seconds):
     }"""
 
     while time.monotonic() < end_time:
+        check_stop()
+
         # A popup suddenly jumped out: stop scrolling and close it first
         paused_at = time.monotonic()
         if close_popups(page, timeout=0):
@@ -618,14 +693,14 @@ def scroll_to_bitcoin(page, seconds):
                 # Overshot: link is below the window, scroll down a little
                 pyautogui.scroll(-random.randint(150, 300))
 
-        time.sleep(random.uniform(0.3, 0.5))
+        sleep(random.uniform(0.3, 0.5))
 
         # Occasionally move the mouse while scrolling back up
         if random.random() < 0.25:
             wander_mouse()
 
     # Stay on the link for a moment before opening it
-    time.sleep(random.uniform(2, 3))
+    sleep(random.uniform(2, 3))
 
 
 # ---------------------------------------------------------------------------
@@ -638,17 +713,32 @@ def move_and_click(page, x, y):
     screen_x, screen_y = page_to_screen(page, x, y)
     move_mouse_human(screen_x, screen_y)
     short_pause()
+    check_stop()
     pyautogui.click()
 
 
 def wait_for_navigation(page, original_url, timeout=10000):
-    """Return True once the URL changes and the new page has loaded."""
-    try:
-        page.wait_for_url(lambda url: str(url) != original_url, timeout=timeout)
-        page.wait_for_load_state("domcontentloaded", timeout=timeout)
-        return True
-    except Exception:
-        return False
+    """Return True once the URL changes and the new page has loaded.
+    Waits in short slices so a stop request is noticed within ~1 s."""
+    end = time.monotonic() + timeout / 1000
+
+    # 1. Wait for the URL to change (polling, interruptible)
+    while str(page.url) == original_url:
+        if time.monotonic() >= end:
+            return False
+        sleep(0.1)
+
+    # 2. Wait for the new document to load, 1 s at a time
+    while True:
+        check_stop()
+        try:
+            page.wait_for_load_state("domcontentloaded", timeout=1000)
+            return True
+        except PlaywrightTimeoutError:
+            if time.monotonic() >= end:
+                return False
+        except Exception:
+            return False
 
 
 def click_box(page, box):
@@ -665,6 +755,7 @@ def click_box(page, box):
     if wait_for_navigation(page, original_url, timeout=5000):
         return True
 
+    check_stop()
     page.mouse.click(click_x, click_y)
     if wait_for_navigation(page, original_url):
         return True
@@ -709,16 +800,19 @@ def pick_link_on_screen(page, pattern, include_nav=False, min_top=110):
 def go_back(page):
     """Press Alt+Left (browser Back) and wait for the previous page."""
     from_url = page.url
-    time.sleep(random.uniform(0.5, 1.5))
+    sleep(random.uniform(0.5, 1.5))
+    check_stop()
     pyautogui.hotkey("alt", "left")
 
     if not wait_for_navigation(page, from_url, timeout=5000):
+        check_stop()
         try:
-            page.go_back(wait_until="domcontentloaded", timeout=10000)
+            # Short timeout: this Playwright call cannot be interrupted
+            page.go_back(wait_until="domcontentloaded", timeout=5000)
         except Exception:
             pass
 
-    time.sleep(random.uniform(1.0, 2.0))
+    sleep(random.uniform(1.0, 2.0))
 
 
 def click_bitcoin(page):
@@ -733,6 +827,7 @@ def click_bitcoin(page):
     # Second pass: any visible link, scrolled into view if necessary.
     for on_screen_only in (True, False):
         for i in range(min(anchors.count(), 50)):
+            check_stop()
             anchor = anchors.nth(i)
 
             try:
@@ -757,6 +852,8 @@ def click_bitcoin(page):
                     box = anchor.bounding_box()
                     if box is None:
                         continue
+            except StopRequested:
+                raise
             except Exception:
                 continue
 
@@ -769,6 +866,7 @@ def click_bitcoin(page):
 
             # If the real mouse click missed, retry with the browser's own click
             if not wait_for_navigation(page, original_url, timeout=5000):
+                check_stop()
                 page.mouse.click(click_x, click_y)
 
                 if not wait_for_navigation(page, original_url):
@@ -864,6 +962,7 @@ def coingecko_rwa_event(page):
     # Find "Gold" on the RWA page, scrolling when it is not on screen yet
     gold = None
     for _ in range(8):
+        check_stop()
         close_popups(page, timeout=0)
         candidates = find_coingecko_gold(page)
 
@@ -879,7 +978,7 @@ def coingecko_rwa_event(page):
             pyautogui.scroll(random.randint(150, 300))     # above: scroll up
         else:
             pyautogui.scroll(-random.randint(200, 350))    # below / not found: scroll down
-        time.sleep(random.uniform(0.6, 1.2))
+        sleep(random.uniform(0.6, 1.2))
 
     if gold is None:
         return
@@ -899,15 +998,27 @@ def coingecko_rwa_event(page):
 def open_new_tab(page):
     """Open a new tab and bring it to the front (pyautogui types into it)."""
     short_pause()
+    check_stop()
     new_page = page.context.new_page()
     new_page.bring_to_front()
     short_pause()
     return new_page
 
 
-def visit_coin_site(page, url):
+def visit_coin_site(page, url, stop_event=None, deadline=None):
     """Open the site, scroll down and back up, open Bitcoin and browse it.
-    Each site can also have its own special event."""
+    Each site can also have its own special event.
+
+    The workflow is split into short steps; stop_event / deadline are checked
+    inside every step and between steps. Raises StopRequested when the phase
+    must end (the caller decides how to clean up).
+
+    stop_event: optional threading.Event
+    deadline:   optional absolute time.monotonic() timestamp
+    """
+    if stop_event is not None or deadline is not None:
+        set_run_control(stop_event, deadline)
+
     site = site_name(url)
 
     # CoinMarketCap: click a random coin while scrolling down
@@ -917,58 +1028,98 @@ def visit_coin_site(page, url):
     # waiting for a popup that never comes), so its waiting time is halved
     wait_scale = 0.5 if site == "coingecko" else 1.0
 
-    # Enter the website
-    navigate(url, pause_scale=wait_scale)
+    # --- short steps -------------------------------------------------------
 
-    # Move the mouse onto the page and close cookie/sign-up popups first
-    move_cursor_to_page()
-    close_popups(page, timeout=8 * wait_scale)
+    def step_enter():
+        navigate(url, pause_scale=wait_scale)
+        move_cursor_to_page()
+        close_popups(page, timeout=8 * wait_scale)
 
-    # Scroll down for 30 s, then back up until the Bitcoin link is on screen
-    scroll_down_for(page, SCROLL_DOWN_SECONDS, mid_event)
-    scroll_to_bitcoin(page, SCROLL_UP_SECONDS)
+    def step_scroll():
+        # Scroll down for 30 s, then back up until the Bitcoin link is on screen
+        scroll_down_for(page, SCROLL_DOWN_SECONDS, mid_event)
+        scroll_to_bitcoin(page, SCROLL_UP_SECONDS)
 
-    # Select Bitcoin (fall back to its direct URL if the link isn't found)
-    if not click_bitcoin(page):
-        if site:
-            navigate(BITCOIN_URLS[site])
+    def step_open_bitcoin():
+        # Fall back to the direct URL if the link isn't found
+        if not click_bitcoin(page):
+            if site:
+                navigate(BITCOIN_URLS[site])
 
-    # Browse the Bitcoin page
-    move_cursor_to_page()
-    close_popups(page, timeout=8)
-    browse_page(page)
+    def step_browse_bitcoin():
+        move_cursor_to_page()
+        close_popups(page, timeout=8)
+        browse_page(page)
 
-    # CoinGecko: after Bitcoin, go back, open RWA, then click Gold
-    if site == "coingecko":
+    def step_rwa():
+        # CoinGecko: after Bitcoin, go back, open RWA, then click Gold
         coingecko_rwa_event(page)
 
+    steps = [step_enter, step_scroll, step_open_bitcoin, step_browse_bitcoin]
+    if site == "coingecko":
+        steps.append(step_rwa)
     # Coinbase: no special event
 
+    for step in steps:
+        check_stop()
+        step()
 
-def main():
+
+# ---------------------------------------------------------------------------
+# Entry points
+# ---------------------------------------------------------------------------
+
+def run_web_phase(stop_event=None, deadline=None):
+    """Standard entry point for main.py.
+
+    stop_event: optional threading.Event - set it to end the phase promptly.
+    deadline:   optional absolute time.monotonic() timestamp for the phase end.
+
+    Returns True if all sites were visited, False if stopped early. Only the
+    browser launched here is closed; nothing else on the machine is touched.
+    """
+    set_run_control(stop_event, deadline)
+    completed = False
+
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=False,
             channel="chrome",
             args=["--start-maximized"],
         )
+        try:
+            context = browser.new_context(no_viewport=True)
+            page = context.new_page()
+            short_pause()
 
-        context = browser.new_context(no_viewport=True)
-        page = context.new_page()
-        short_pause()
+            # Visit all three coin market websites in a random order
+            sites = random.sample(url_list, len(url_list))
 
-        # Visit all three coin market websites in a random order
-        sites = random.sample(url_list, len(url_list))
+            current_page = page
+            for i, url in enumerate(sites):
+                check_stop()
+                if i > 0:
+                    current_page = open_new_tab(current_page)
 
-        current_page = page
-        for i, url in enumerate(sites):
-            if i > 0:
-                current_page = open_new_tab(current_page)
+                visit_coin_site(current_page, url)
 
-            visit_coin_site(current_page, url)
+            reading_pause()
+            completed = True
+        except StopRequested:
+            completed = False
+        finally:
+            # Close only the browser this task launched
+            try:
+                browser.close()
+            except Exception:
+                pass
+            set_run_control(None, None)
 
-        reading_pause()
-        browser.close()
+    return completed
+
+
+def main():
+    run_web_phase()
 
 
 if __name__ == "__main__":
