@@ -7,7 +7,7 @@ ordinary desktop UI automation.
 """
 
 import math
-import pyautogui
+
 
 
 # ------------------------------------------
@@ -109,6 +109,9 @@ def validate_path(points, expected_start, expected_end):
     if not points:
         raise ValueError("Path cannot be empty")
 
+    if not all(math.isfinite(v) for point in [*points, expected_start, expected_end] for v in point):
+        raise ValueError("Path coordinates must be finite")
+
     tolerance = 1e-6
 
     if distance_between(
@@ -128,7 +131,7 @@ def validate_path(points, expected_start, expected_end):
 # 5. Move the cursor in an ordinary UI
 # ------------------------------------------
 
-def move_cursor_to(x, y, duration=0.5):
+def move_cursor_to(x, y, duration=0.5, *, backend=None):
     """
     Move the cursor to a screen coordinate.
 
@@ -136,10 +139,14 @@ def move_cursor_to(x, y, duration=0.5):
     This function does not click anything.
     """
 
+    if not all(math.isfinite(value) for value in (x, y, duration)):
+        raise ValueError("coordinates and duration must be finite")
     if duration < 0:
         raise ValueError("duration cannot be negative")
 
-    screen_width, screen_height = pyautogui.size()
+    if backend is None:
+        import pyautogui as backend
+    screen_width, screen_height = backend.size()
 
     if not (0 <= x < screen_width):
         raise ValueError("x is outside the screen")
@@ -147,11 +154,11 @@ def move_cursor_to(x, y, duration=0.5):
     if not (0 <= y < screen_height):
         raise ValueError("y is outside the screen")
 
-    pyautogui.moveTo(
+    backend.moveTo(
         x,
         y,
         duration=duration,
-        tween=pyautogui.easeInOutQuad
+        tween=backend.easeInOutQuad
     )
 
 
