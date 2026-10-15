@@ -1,0 +1,9 @@
+{
+  "title": "Synthetic team workshop",
+  "currency": "USD",
+  "items": [
+    {"name": "Room hire", "quantity": 1, "unit_price": "250.00"},
+    {"name": "Lunch", "quantity": 12, "unit_price": "18.50"},
+    {"name": "Materials", "quantity": 12, "unit_price": "7.25"}
+  ]
+}
