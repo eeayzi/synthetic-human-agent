@@ -1,170 +1,157 @@
-import time
-import random
-import pyautogui
-from process_prep import launch_process
-
-# CONFIGURATION
-
-word_path = r"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE"
-
-text_to_type = "Hi team, quick update on the Q3 report. I've reviewed the draft and most sections look solid. The budget numbers still need a second check before we send this out. I'll follow up with finance in the morning and get back to everyone by noon."
-
-nearby_keys = {
-    "q": ["w", "a"], "w": ["q", "e", "a", "s"], "e": ["w", "r", "s", "d"],
-    "r": ["e", "t", "d", "f"], "t": ["r", "y", "f", "g"], "y": ["t", "u", "g", "h"],
-    "u": ["y", "i", "h", "j"], "i": ["u", "o", "j", "k"], "o": ["i", "p", "k", "l"],
-    "p": ["o", "l"], "a": ["q", "w", "s", "z"], "s": ["a", "w", "e", "d", "z", "x"],
-    "d": ["s", "e", "r", "f", "x", "c"], "f": ["d", "r", "t", "g", "c", "v"],
-    "g": ["f", "t", "y", "h", "v", "b"], "h": ["g", "y", "u", "j", "b", "n"],
-    "j": ["h", "u", "i", "k", "n", "m"], "k": ["j", "i", "o", "l", "m"],
-    "l": ["k", "o", "p"], "z": ["a", "s", "x"], "x": ["z", "s", "d", "c"],
-    "c": ["x", "d", "f", "v"], "v": ["c", "f", "g", "b"], "b": ["v", "g", "h", "n"],
-    "n": ["b", "h", "j", "m"], "m": ["n", "j", "k"],
-}
-
-WORD_TYPO_CHANCE = 0.15
-
-# TIMING HELPER FUNCTIONS
-
-def get_fatigue_multiplier(chars_typed_so_far, total_chars):
-    if total_chars == 0:
-        return 1.0
-    progress = chars_typed_so_far / total_chars
-    return 1.0 + (progress * 0.3)
+"""Windows Office COM adapter. Operates on owned documents, never global input."""
+from contextlib import contextmanager
+from decimal import Decimal
+import sys
+from runtime import artifact
+from scenario import report_text
 
 
-def get_pause_time(char, chars_typed_so_far, total_chars):
-    if char == ".":
-        pause = random.gauss(3, 0.25)
-        pause = max(pause, 2.5)
-    elif char == " ":
-        pause = random.gauss(0.35, 0.075)
-        pause = max(pause, 0.2)
-    else:
-        pause = random.gauss(0.125, 0.0375)
-        pause = max(pause, 0.08)
-
-    fatigue = get_fatigue_multiplier(chars_typed_so_far, total_chars)
-    return pause * fatigue
+def normalized(text):
+    return text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
 
 
-def type_char_with_pause(char, chars_typed_state):
-    pyautogui.write(char)
-    chars_typed_state["count"] += 1
-    pause_time = get_pause_time(char, chars_typed_state["count"], chars_typed_state["total"])
-    time.sleep(pause_time)
-
-
-def backspace_n_times(n):
-    for _ in range(n):
-        pyautogui.press("backspace")
-        time.sleep(random.uniform(0.05, 0.15))
-
-# TYPO GENERATION FUNCTIONS
-
-def apply_adjacent_swap_typo(word):
-    if len(word) < 2:
-        return word
-    swap_index = random.randint(0, len(word) - 2)
-    before = word[:swap_index]
-    first_letter = word[swap_index]
-    second_letter = word[swap_index + 1]
-    after = word[swap_index + 2:]
-    return before + second_letter + first_letter + after
-
-
-def apply_double_letter_typo(word):
-    if len(word) < 1:
-        return word
-    repeat_index = random.randint(0, len(word) - 1)
-    before = word[:repeat_index]
-    repeated_letter = word[repeat_index]
-    after = word[repeat_index + 1:]
-    return before + repeated_letter + repeated_letter + after
-
-
-def apply_adjacent_key_typo(word):
-    eligible_positions = [i for i, c in enumerate(word) if c.lower() in nearby_keys]
-    if not eligible_positions:
-        return word
-    typo_index = random.choice(eligible_positions)
-    original_letter = word[typo_index]
-    wrong_letter = random.choice(nearby_keys[original_letter.lower()])
-    before = word[:typo_index]
-    after = word[typo_index + 1:]
-    return before + wrong_letter + after
-
-# WORD TYPING LOGIC
-
-def type_word(word, chars_typed_state):
-    if len(word) >= 2 and random.random() < WORD_TYPO_CHANCE:
-        typo_type = random.choice(["swap", "double", "adjacent_key"])
-
-        if typo_type == "swap":
-            wrong_version = apply_adjacent_swap_typo(word)
-        elif typo_type == "double":
-            wrong_version = apply_double_letter_typo(word)
-        else:
-            wrong_version = apply_adjacent_key_typo(word)
-
-        for c in wrong_version:
-            type_char_with_pause(c, chars_typed_state)
-
-        time.sleep(random.uniform(0.5, 1.3))
-
-        backspace_n_times(len(wrong_version))
-
-        for c in word:
-            type_char_with_pause(c, chars_typed_state)
-
-    else:
-        for c in word:
-            type_char_with_pause(c, chars_typed_state)
-
-# MAIN SCRIPT
-
-def main():
+@contextmanager
+def office_session(prog_id, collection_name, control):
+    if sys.platform != "win32":
+        raise RuntimeError("Live Office automation requires Windows and installed Word/Excel")
+    import pythoncom
+    from win32com.client import DispatchEx
+    pythoncom.CoInitialize()
+    app = None
+    owned = []
+    cleanup_errors = []
+    preserved = False
+    previous_settings = {}
     try:
-        launch_process(word_path)
-        print("Word launch requested.")
-    except Exception as e:
-        print(f"Failed to launch Word: {e}")
-        return
-
-    time.sleep(5)
-
-    try:
-        words = text_to_type.split(" ")
-        total_chars = len(text_to_type)
-        chars_typed_state = {"count": 0, "total": total_chars}
-
-        for index, word in enumerate(words):
-            type_word(word, chars_typed_state)
-
-            if index < len(words) - 1:
-                type_char_with_pause(" ", chars_typed_state)
-
-        print("Typing finished.")
-
-    except Exception as e:
-        print(f"An error occurred while typing: {e}")
-        return
-
-    try:
-        pyautogui.hotkey("ctrl", "s")
-        time.sleep(random.uniform(1, 2))
-        pyautogui.press("enter")
-        time.sleep(random.uniform(1, 2))
-        print("Document saved.")
-    except Exception as e:
-        print(f"Failed to save document: {e}")
-
-    try:
-        pyautogui.hotkey("alt", "f4")
-        print("Word closed.")
-    except Exception as e:
-        print(f"Failed to close Word: {e}")
+        control.check()
+        app = DispatchEx(prog_id)
+        app.Visible = True
+        for name in ("DisplayAlerts", "AutomationSecurity"):
+            previous_settings[name] = getattr(app, name)
+        app.DisplayAlerts = 0
+        app.AutomationSecurity = 3  # Force-disable macros in programmatically opened files.
+        control.audit.emit("office_session_opened", backend="office_com", application=prog_id)
+        yield app, owned
+    finally:
+        # Cancellation never prevents cleanup. Never close arbitrary collection members.
+        for document in reversed(owned):
+            try:
+                document.Close(SaveChanges=False)
+            except Exception as error:
+                cleanup_errors.append(type(error).__name__)
+        if app is not None:
+            for name, value in previous_settings.items():
+                try:
+                    setattr(app, name, value)
+                except Exception as error:
+                    cleanup_errors.append(type(error).__name__)
+            try:
+                if getattr(app, collection_name).Count == 0:
+                    app.Quit()
+                else:
+                    preserved = True  # Someone may have opened another document in this instance.
+            except Exception as error:
+                cleanup_errors.append(type(error).__name__)
+        app = None
+        pythoncom.CoUninitialize()
+        control.audit.emit("office_cleanup", backend="office_com", application=prog_id,
+                           errors=cleanup_errors, instance_preserved=preserved)
+        if cleanup_errors and sys.exc_info()[0] is None:
+            raise RuntimeError("Office cleanup failed: " + ", ".join(cleanup_errors))
 
 
-if __name__ == "__main__":
-    main()
+def observe_office_process(app, application, control):
+    """Record the observed window's PID; never assume a launcher or parent PID."""
+    import win32process
+    hwnd = app.Hwnd if application == "Excel" else app.ActiveWindow.Hwnd
+    _, pid = win32process.GetWindowThreadProcessId(int(hwnd))
+    control.audit.emit("office_process_observed", backend="office_com",
+                       application=application, observed_pid=pid, window_handle=int(hwnd))
+
+
+def close_owned(document, owned):
+    document.Close(SaveChanges=False)
+    owned.remove(document)
+
+
+def create_budget(data, workspace, control):
+    path = (workspace / "budget.xlsx").resolve()
+    if path.exists():
+        raise FileExistsError(path)
+    with office_session("Excel.Application", "Workbooks", control) as (app, owned):
+        workbook = app.Workbooks.Add()
+        owned.append(workbook)
+        observe_office_process(app, "Excel", control)
+        sheet = workbook.Worksheets(1)
+        sheet.Name = "Budget"
+        headers = ("Item", "Quantity", "Unit price", "Line total")
+        for column, value in enumerate(headers, 1):
+            sheet.Cells(1, column).Value = value
+        for row, item in enumerate(data["items"], 2):
+            control.check()
+            sheet.Cells(row, 1).NumberFormat = "@"
+            sheet.Cells(row, 1).Value = item["name"]
+            sheet.Cells(row, 2).Value = item["quantity"]
+            sheet.Cells(row, 3).Value = float(item["unit_price"])
+            sheet.Cells(row, 4).Formula = f"=B{row}*C{row}"
+            control.pause()
+        total_row = len(data["items"]) + 2
+        sheet.Cells(total_row, 1).Value = "Total " + data["currency"]
+        formula = f"=SUM(D2:D{total_row - 1})"
+        sheet.Cells(total_row, 4).Formula = formula
+        sheet.Range(f"C2:D{total_row}").NumberFormat = "0.00"
+        sheet.Range("A1:D1").Font.Bold = True
+        sheet.Columns("A:D").AutoFit()
+        app.Calculate()
+        control.check()
+        workbook.SaveAs(Filename=str(path), FileFormat=51)  # .xlsx
+        close_owned(workbook, owned)
+        control.check()
+        reopened = app.Workbooks.Open(Filename=str(path), UpdateLinks=0, ReadOnly=True)
+        owned.append(reopened)
+        saved = reopened.Worksheets("Budget")
+        for row, item in enumerate(data["items"], 2):
+            control.check()
+            if (saved.Cells(row, 1).Value != item["name"]
+                    or saved.Cells(row, 2).Value != item["quantity"]
+                    or Decimal(str(saved.Cells(row, 3).Value)).quantize(Decimal(".01")) != Decimal(item["unit_price"])
+                    or Decimal(str(saved.Cells(row, 4).Value)).quantize(Decimal(".01")) != Decimal(item["line_total"])
+                    or saved.Cells(row, 4).Formula != f"=B{row}*C{row}"):
+                raise RuntimeError(f"Saved budget row {row} did not match")
+        observed = Decimal(str(saved.Cells(total_row, 4).Value)).quantize(Decimal(".01"))
+        if observed != Decimal(data["total"]) or saved.Cells(total_row, 4).Formula != formula:
+            raise RuntimeError("Saved budget total/formula did not match")
+        result = artifact(path)
+        result["total"] = format(observed, ".2f")
+        control.audit.emit("artifact_verified", backend="office_com", kind="budget", **result)
+    control.check()
+    return result
+
+
+def create_report(data, budget, workspace, control):
+    if budget["total"] != data["total"]:
+        raise RuntimeError("Report requires the verified budget total")
+    path = (workspace / "report.docx").resolve()
+    if path.exists():
+        raise FileExistsError(path)
+    text = report_text(data, control.audit.run_id)
+    with office_session("Word.Application", "Documents", control) as (app, owned):
+        document = app.Documents.Add()
+        owned.append(document)
+        observe_office_process(app, "Word", control)
+        for line in text.splitlines():
+            control.check()
+            document.Content.InsertAfter(line + "\r")
+            control.pause()
+        control.check()
+        document.SaveAs2(FileName=str(path), FileFormat=12, AddToRecentFiles=False)
+        close_owned(document, owned)
+        control.check()
+        reopened = app.Documents.Open(FileName=str(path), ReadOnly=True, AddToRecentFiles=False)
+        owned.append(reopened)
+        if normalized(reopened.Content.Text) != normalized(text):
+            raise RuntimeError("Saved report content did not match")
+        result = artifact(path)
+        control.audit.emit("artifact_verified", backend="office_com", kind="report", **result)
+    control.check()
+    return result
