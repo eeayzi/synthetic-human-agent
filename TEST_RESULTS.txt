@@ -1,0 +1,56 @@
+test_cleanup_closes_only_owned_document (test_adapters.OfficeTests.test_cleanup_closes_only_owned_document) ... ok
+test_cleanup_failure_is_visible (test_adapters.OfficeTests.test_cleanup_failure_is_visible) ... ok
+test_content_is_entered_through_typing_function (test_adapters.OfficeTests.test_content_is_entered_through_typing_function) ... ok
+test_corrupted_reopened_file_is_not_verified (test_adapters.OfficeTests.test_corrupted_reopened_file_is_not_verified) ... ok
+test_failed_save_never_reopens (test_adapters.OfficeTests.test_failed_save_never_reopens) ... ok
+test_modified_text_is_not_silently_overwritten (test_adapters.OfficeTests.test_modified_text_is_not_silently_overwritten) ... ok
+test_save_reopen_verifies_content_and_hash (test_adapters.OfficeTests.test_save_reopen_verifies_content_and_hash) ... ok
+test_browser_cleanup_stops_driver_even_when_close_fails (test_adapters.WebTests.test_browser_cleanup_stops_driver_even_when_close_fails) ... ok
+test_miscalibrated_pointer_never_clicks (test_adapters.WebTests.test_miscalibrated_pointer_never_clicks) ... ok
+test_pointer_must_be_over_verified_link (test_adapters.WebTests.test_pointer_must_be_over_verified_link) ... ok
+test_verified_pointer_click_uses_native_input (test_adapters.WebTests.test_verified_pointer_click_uses_native_input) ... ok
+test_default_mode_is_virtual_and_has_consistent_audit (test_cli.CliTests.test_default_mode_is_virtual_and_has_consistent_audit) ... ok
+test_invalid_duration_creates_no_outputs (test_cli.CliTests.test_invalid_duration_creates_no_outputs) ... ok
+test_tiny_duration_does_not_report_completion (test_cli.CliTests.test_tiny_duration_does_not_report_completion) ... ok
+test_geometry (test_geometry.TestGeometry.test_geometry) ... ok
+test_invalid_path_numbers (test_geometry.TestGeometry.test_invalid_path_numbers) ... ok
+test_invalid_target_never_moves (test_geometry.TestMoveCursorTo.test_invalid_target_never_moves) ... ok
+test_valid_target (test_geometry.TestMoveCursorTo.test_valid_target) ... ok
+test_foreground_loss_sends_nothing (test_submission.GuardTests.test_foreground_loss_sends_nothing) ... ok
+test_pid_change_sends_nothing (test_submission.GuardTests.test_pid_change_sends_nothing) ... ok
+test_ribbon_focus_is_rejected (test_submission.GuardTests.test_ribbon_focus_is_rejected) ... ok
+test_valid_body_focus_sends_single_character (test_submission.GuardTests.test_valid_body_focus_sends_single_character) ... ok
+test_wrong_active_document_stops_input (test_submission.GuardTests.test_wrong_active_document_stops_input) ... ok
+test_curve_reaches_target_and_uses_guarded_steps (test_submission.MouseTests.test_curve_reaches_target_and_uses_guarded_steps) ... ok
+test_stop_prevents_cursor_path (test_submission.MouseTests.test_stop_prevents_cursor_path) ... ok
+test_wheel_chunks_are_small_and_preserve_total (test_submission.MouseTests.test_wheel_chunks_are_small_and_preserve_total) ... ok
+test_fixture_escapes_content (test_submission.SessionTests.test_fixture_escapes_content) ... ok
+test_full_virtual_session_and_metrics (test_submission.SessionTests.test_full_virtual_session_and_metrics) ... ok
+test_idle_normal_boundary_vs_stop (test_submission.SessionTests.test_idle_normal_boundary_vs_stop) ... ok
+test_insufficient_time_is_cancelled_not_success (test_submission.SessionTests.test_insufficient_time_is_cancelled_not_success) ... ok
+test_invalid_config_phase_order (test_submission.SessionTests.test_invalid_config_phase_order) ... ok
+test_invalid_scenario_encoding (test_submission.SessionTests.test_invalid_scenario_encoding) ... ok
+test_preexisting_stop (test_submission.SessionTests.test_preexisting_stop) ... ok
+test_deadline_stops_typing (test_submission.TypingTests.test_deadline_stops_typing) ... ok
+test_emergency_stops_before_any_input (test_submission.TypingTests.test_emergency_stops_before_any_input) ... ok
+test_fatigue_capped (test_submission.TypingTests.test_fatigue_capped) ... ok
+test_no_typo_mode_is_exact (test_submission.TypingTests.test_no_typo_mode_is_exact) ... ok
+test_rejects_non_ascii_before_input (test_submission.TypingTests.test_rejects_non_ascii_before_input) ... ok
+test_seed_repeats_timing (test_submission.TypingTests.test_seed_repeats_timing) ... ok
+test_typo_corrections_preserve_every_character (test_submission.TypingTests.test_typo_corrections_preserve_every_character) ... ok
+
+----------------------------------------------------------------------
+Ran 40 tests in 0.160s
+
+OK
+
+Environment: macOS, Python 3.14.2.
+Automated suite: 40 passed. Office/browser tests use fakes; fake DOCX test bytes are not real Office output.
+CLI simulation: passed; 900 seconds virtual activity, five completed phases, exact intended report text.
+100-seed typing stress check: passed; all typo corrections preserved intended text.
+Maximum modeled typing time over those seeds: draft 179.30 s; completion 155.11 s, each within its 240 s allocation.
+Modeled times exclude real OS/COM overhead and do not certify Windows phase timing.
+Compilation: passed.
+Local HTTP integration: attempted, BLOCKED by sandbox (PermissionError during loopback bind).
+Real Windows/Word/Chromium input, DPI/focus behavior and PowerShell Sysmon export: NOT RUN.
+Complete WINDOWS_ACCEPTANCE.md on the demo machine before claiming live validation.

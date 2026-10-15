@@ -1,0 +1,5 @@
+# Simulation and unit tests have no external dependencies.
+# Live desktop packages; exact versions must be recorded after Windows acceptance.
+PyAutoGUI>=0.9.54,<1
+playwright>=1.40,<2
+pywin32>=306; sys_platform == "win32"

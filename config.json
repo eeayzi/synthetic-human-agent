@@ -1,0 +1,12 @@
+{
+  "duration_seconds": 900,
+  "seed": 42,
+  "typo_probability": 0.12,
+  "phases": [
+    {"name": "read_brief", "share": 0.13333333333333333},
+    {"name": "draft_report", "share": 0.26666666666666666},
+    {"name": "check_reference", "share": 0.2},
+    {"name": "finish_report", "share": 0.26666666666666666},
+    {"name": "verify_and_review", "share": 0.13333333333333333}
+  ]
+}
