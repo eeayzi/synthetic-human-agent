@@ -1,0 +1,4 @@
+# Simulation and tests use only Python's standard library.
+# Live dependencies; ranges are not a Windows-validated lock file.
+playwright>=1.40,<2
+pywin32>=306; sys_platform == "win32"
