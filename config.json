@@ -2,6 +2,18 @@
   "duration_seconds": 900,
   "seed": 42,
   "typo_probability": 0.12,
+  "websites": [
+    "en.wikipedia.org",
+    "https://www.coinmarketcap.com",
+    "https://www.coursera.org",
+    "https://www.coinbase.com",
+    "https://www.samsung.com",
+    "https://aws.amazon.com",
+    "https://www.amazon.com",
+    "https://www.apple.com",
+    "https://apnews.com",
+    "https://www.dell.com"
+  ],
   "phases": [
     {"name": "read_brief", "share": 0.13333333333333333},
     {"name": "draft_report", "share": 0.26666666666666666},

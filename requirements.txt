@@ -3,3 +3,4 @@
 PyAutoGUI>=0.9.54,<1
 playwright>=1.40,<2
 pywin32>=306; sys_platform == "win32"
+playwright-stealth>=2.0.3,<3

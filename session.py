@@ -52,14 +52,14 @@ def run_session(config, scenario, output_root, mode='simulation', stop=None):
             control.check()
             if mode == 'live':
                 from desktop import WindowsDesktop
-                from fixtures import pages, serve_pages
+                # from fixtures import pages, serve_pages
                 from web_agent import WebAgent
                 from office_agent import OfficeAgent
                 desktop = WindowsDesktop()
                 control.emergency = desktop.emergency
                 marker = 'Synthetic-'+audit.run_id
-                origin = resources.enter_context(serve_pages(pages(scenario, marker)))
-                web = WebAgent(desktop, control, origin, marker)
+                # origin = resources.enter_context(serve_pages(pages(scenario, marker)))
+                web = WebAgent(desktop, control, marker)
                 office = OfficeAgent(desktop, control, workspace, config['typo_probability'])
             boundary = started
             for index, phase in enumerate(config['phases']):
@@ -82,8 +82,9 @@ def run_session(config, scenario, output_root, mode='simulation', stop=None):
                         (workspace/'intended-report.txt').write_text(fake_input.text, encoding='utf-8')
                     control.idle_until(boundary, 'simulated_'+name)
                 elif name == 'read_brief':
+                    target_url = control.rng.choice(config['websites'])
                     web.open()
-                    web.navigate('brief')
+                    web.navigate(target_url)
                     web.browse_until(boundary)
                 elif name == 'draft_report':
                     office.open()
@@ -91,7 +92,8 @@ def run_session(config, scenario, output_root, mode='simulation', stop=None):
                     office.save_checkpoint()
                     office.review_until(boundary)
                 elif name == 'check_reference':
-                    web.click_reference_link()
+                    target_url = control.rng.choice(config['websites'])
+                    web.navigate(target_url)  # Navigate to a different real URL
                     web.browse_until(boundary)
                 elif name == 'finish_report':
                     office.append(scenario['completion'])
