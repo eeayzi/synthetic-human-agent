@@ -74,49 +74,41 @@ def test_invalid_t():
     else:
         raise AssertionError("Invalid t was not rejected")
 
+class TestGeometry(unittest.TestCase):
+    def test_geometry(self):
+        test_bezier_endpoints()
+        test_path_length()
+        test_middle_point()
+        test_distance()
+        test_path_validation()
+        test_invalid_t()
+
+    def test_invalid_path_numbers(self):
+        with self.assertRaises(ValueError):
+            validate_path([(float("nan"), 0)], (0, 0), (0, 0))
+
+
 class TestMoveCursorTo(unittest.TestCase):
+    def test_valid_target(self):
+        from unittest.mock import Mock
+        backend = Mock()
+        backend.size.return_value = (1000, 800)
+        move_cursor_to(300, 200, duration=0.5, backend=backend)
+        backend.moveTo.assert_called_once_with(
+            300, 200, duration=0.5, tween=backend.easeInOutQuad)
 
-    @patch("stealth_mouse.pyautogui.moveTo")
-    @patch("stealth_mouse.pyautogui.size", return_value=(1000, 800))
-    def test_valid_target(self, mock_size, mock_move):
-        move_cursor_to(300, 200, duration=0.5)
-
-        mock_move.assert_called_once_with(
-            300, 200,
-            duration=0.5,
-            tween=__import__("pyautogui").easeInOutQuad
-        )
-
-    @patch("stealth_mouse.pyautogui.moveTo")
-    def test_negative_duration(self, mock_move):
-        with self.assertRaises(ValueError):
-            move_cursor_to(300, 200, duration=-1)
-
-        mock_move.assert_not_called()
-
-    @patch("stealth_mouse.pyautogui.moveTo")
-    @patch("stealth_mouse.pyautogui.size", return_value=(1000, 800))
-    def test_x_outside_screen(self, mock_size, mock_move):
-        with self.assertRaises(ValueError):
-            move_cursor_to(1000, 200)
-
-        mock_move.assert_not_called()
-
-    @patch("stealth_mouse.pyautogui.moveTo")
-    @patch("stealth_mouse.pyautogui.size", return_value=(1000, 800))
-    def test_y_outside_screen(self, mock_size, mock_move):
-        with self.assertRaises(ValueError):
-            move_cursor_to(300, 800)
-
-        mock_move.assert_not_called()
+    def test_invalid_target_never_moves(self):
+        from unittest.mock import Mock
+        for x, y, duration in [(1000, 200, .5), (300, 800, .5),
+                                (300, 200, -1), (300, 200, float("nan")),
+                                (float("inf"), 200, .5)]:
+            backend = Mock()
+            backend.size.return_value = (1000, 800)
+            with self.subTest(x=x, y=y, duration=duration):
+                with self.assertRaises(ValueError):
+                    move_cursor_to(x, y, duration, backend=backend)
+                backend.moveTo.assert_not_called()
 
 
 if __name__ == "__main__":
-    test_bezier_endpoints()
-    test_path_length()
-    test_middle_point()
-    test_distance()
-    test_path_validation()
-    test_invalid_t()
-
-    print("All six test checks passed.")
+    unittest.main()
