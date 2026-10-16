@@ -104,27 +104,27 @@ class WebTests(unittest.TestCase):
         agent.page.locator.return_value.bounding_box.return_value={'x':100,'y':50,'width':40,'height':20}
         return agent
 
-    # def test_miscalibrated_pointer_never_clicks(self):
-    #     agent=self.make_agent()
-    #     agent.page.evaluate.return_value={'x':900,'y':900}
-    #     with patch('web_agent.move_mouse_human'):
-    #         with self.assertRaisesRegex(RuntimeError,'calibration'): agent.click_reference_link()
-    #     agent.ui.click.assert_not_called()
+    def test_miscalibrated_pointer_never_clicks(self):
+        agent=self.make_agent()
+        agent.page.evaluate.return_value={'x':900,'y':900}
+        with patch('web_agent.move_mouse_human'):
+            with self.assertRaisesRegex(RuntimeError,'calibration'): agent.click_reference_link()
+        agent.ui.click.assert_not_called()
 
-    # def test_pointer_must_be_over_verified_link(self):
-    #     agent=self.make_agent()
-    #     agent.page.evaluate.side_effect=[{'x':120,'y':60},False]
-    #     with patch('web_agent.move_mouse_human'):
-    #         with self.assertRaisesRegex(RuntimeError,'not over'): agent.click_reference_link()
-    #     agent.ui.click.assert_not_called()
+    def test_pointer_must_be_over_verified_link(self):
+        agent=self.make_agent()
+        agent.page.evaluate.side_effect=[{'x':120,'y':60},False]
+        with patch('web_agent.move_mouse_human'):
+            with self.assertRaisesRegex(RuntimeError,'not over'): agent.click_reference_link()
+        agent.ui.click.assert_not_called()
 
-    # def test_verified_pointer_click_uses_native_input(self):
-    #     agent=self.make_agent()
-    #     agent.page.evaluate.side_effect=[{'x':120,'y':60},True]
-    #     with patch('web_agent.move_mouse_human'): agent.click_reference_link()
-    #     agent.ui.click.assert_called_once()
-    #     agent.page.mouse.click.assert_not_called()
-    #     agent.page.wait_for_url.assert_called_once()
+    def test_verified_pointer_click_uses_native_input(self):
+        agent=self.make_agent()
+        agent.page.evaluate.side_effect=[{'x':120,'y':60},True]
+        with patch('web_agent.move_mouse_human'): agent.click_reference_link()
+        agent.ui.click.assert_called_once()
+        agent.page.mouse.click.assert_not_called()
+        agent.page.wait_for_url.assert_called_once()
 
     def test_browser_cleanup_stops_driver_even_when_close_fails(self):
         agent=self.make_agent()
