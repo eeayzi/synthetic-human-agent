@@ -4,11 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f86ea62f-7741-48de-a164-dc76a614728f" name="Changes" comment="add recommended websites (incomplete)">
+    <list default="true" id="f86ea62f-7741-48de-a164-dc76a614728f" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/fixtures.py" beforeDir="false" afterPath="$PROJECT_DIR$/fixtures.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/session.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_adapters.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_adapters.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/web_agent.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -53,7 +56,6 @@
     "Python.main.executor": "Run",
     "Python.process_prep.executor": "Run",
     "Python.test_core_web.executor": "Run",
-    "Python.test_pure_gui.executor": "Run",
     "Python.test_web.executor": "Run",
     "Python.web_agent.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
@@ -95,15 +97,7 @@
       <option name="project" value="LOCAL" />
       <updated>1790783805106</updated>
     </task>
-    <task id="LOCAL-00003" summary="add recommended websites (incomplete)">
-      <option name="closed" value="true" />
-      <created>1792083899905</created>
-      <option name="number" value="00003" />
-      <option name="presentableId" value="LOCAL-00003" />
-      <option name="project" value="LOCAL" />
-      <updated>1792083899906</updated>
-    </task>
-    <option name="localTasksCounter" value="4" />
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -120,7 +114,6 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="setup" />
     <MESSAGE value="get explorer.exe PID" />
-    <MESSAGE value="add recommended websites (incomplete)" />
-    <option name="LAST_COMMIT_MESSAGE" value="add recommended websites (incomplete)" />
+    <option name="LAST_COMMIT_MESSAGE" value="get explorer.exe PID" />
   </component>
 </project>
