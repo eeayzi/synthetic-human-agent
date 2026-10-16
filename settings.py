@@ -14,7 +14,7 @@ def number(value, name, minimum=0, inclusive=False):
 
 def load_config(path):
     data = json.loads(Path(path).read_text(encoding='utf-8-sig'))
-    if not isinstance(data, dict) or set(data) != {'duration_seconds', 'seed', 'typo_probability', 'phases', 'websites'}:
+    if not isinstance(data, dict) or set(data) != {'duration_seconds', 'seed', 'typo_probability', 'phases', 'websites', 'anchor_images'}:
         raise ValueError('Invalid config keys')
     number(data['duration_seconds'], 'duration_seconds')
     if isinstance(data['seed'], bool) or not isinstance(data['seed'], int):
@@ -24,6 +24,8 @@ def load_config(path):
         raise ValueError('typo_probability must not exceed 1')
     if not isinstance(data['websites'], list) or not data['websites']:
         raise ValueError('config websites must be a non-empty list of URLs')
+    if not isinstance(data['anchor_images'], dict):
+        raise ValueError('config anchor_images must be a dictionary')
     phases = data['phases']
     if not isinstance(phases, list) or len(phases) != len(PHASES):
         raise ValueError('All five phases are required')

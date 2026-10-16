@@ -3,7 +3,6 @@
   "seed": 42,
   "typo_probability": 0.12,
   "websites": [
-    "en.wikipedia.org",
     "https://www.coinmarketcap.com",
     "https://www.coursera.org",
     "https://www.coinbase.com",
@@ -14,6 +13,11 @@
     "https://apnews.com",
     "https://www.dell.com"
   ],
+  "anchor_images": {
+    "coursera": "coursera_logo.png",
+    "samsung": "samsung_logo.png",
+    "apnews": "apnews_logo.png"
+  },
   "phases": [
     {"name": "read_brief", "share": 0.13333333333333333},
     {"name": "draft_report", "share": 0.26666666666666666},

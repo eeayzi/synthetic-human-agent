@@ -59,7 +59,7 @@ def run_session(config, scenario, output_root, mode='simulation', stop=None):
                 control.emergency = desktop.emergency
                 marker = 'Synthetic-'+audit.run_id
                 # origin = resources.enter_context(serve_pages(pages(scenario, marker)))
-                web = WebAgent(desktop, control, marker)
+                web = WebAgent(desktop, control, marker, config)
                 office = OfficeAgent(desktop, control, workspace, config['typo_probability'])
             boundary = started
             for index, phase in enumerate(config['phases']):
