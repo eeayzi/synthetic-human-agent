@@ -1,0 +1,7 @@
+{
+  "title": "Public course research session",
+  "brief": "Browse the public Coursera computer science catalogue. Record the browsing session without signing in or enrolling.",
+  "reference": "Visit the public Learning How to Learn course page. Stop if the site requests verification, login or access approval.",
+  "draft": "Public course research session\n\nThis is a synthetic office activity demonstration. The browser is used to inspect public Coursera pages, and this document contains prewritten demonstration notes.\n\nThe first page is the computer science catalogue. The purpose of this session is to demonstrate visible browsing, reading pauses, typing and application switching. No account is used and no course is purchased or enrolled in.\n\nThe audit records the actual page addresses and titles observed during the run. These notes are not an automatically generated evaluation of the courses.\n\n",
+  "completion": "Reference page review\n\nThe second configured page is Learning How to Learn on Coursera. A successful run means the page was accessible and the report text was saved and verified. It does not mean a course was completed or recommended.\n\nIf the website presents a CAPTCHA, an access restriction or an unexpected dialog, the session stops for human review. The program does not attempt to bypass the restriction.\n\nThe final report is reopened and checked against the intended text before the session is marked complete.\n"
+}
